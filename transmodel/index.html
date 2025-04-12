@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hieroglyph Translator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        header {
+            background-color: #d4a373;
+            padding: 20px;
+            text-align: center;
+            color: white;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 2.5em;
+        }
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .input-group input {
+            width: 70%;
+            padding: 10px;
+            font-size: 1.2em;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .input-group button {
+            padding: 10px 20px;
+            background-color: #d4a373;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        .input-group button:hover {
+            background-color: #b88a5f;
+        }
+        .result {
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-left: 4px solid #d4a373;
+        }
+        .result h2 {
+            margin-top: 0;
+            color: #d4a373;
+        }
+        footer {
+            text-align: center;
+            padding: 20px;
+            background-color: #333;
+            color: white;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Powerful Egyptian Hieroglyph Translator</h1>
+        <p>Translate over 10,000 hieroglyphic symbols</p>
+    </header>
+    <div class="container">
+        <div class="input-group">
+            <label for="hieroglyphs">Enter Hieroglyphs:</label>
+            <input type="text" id="hieroglyphs" placeholder="e.g., 𓇋𓏏𓋹">
+            <button onclick="translate()">Translate</button>
+        </div>
+        <div id="result"></div>
+    </div>
+    <footer>
+        <p>© 2025 Hieroglyph Translator. Powered by neuro hotep technology.</p>
+    </footer>
+
+    <script>
+        async function translate() {
+            const input = document.getElementById('hieroglyphs').value.trim();
+            if (!input) {
+                alert('Please enter hieroglyphs');
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:5000/translate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ hieroglyphs: input }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('result').innerHTML = `
+                        <div class="result">
+                            <h2>Translation Results:</h2>
+                            <p><strong>Input Hieroglyphs:</strong> ${data.input}</p>
+                            <p><strong>Transliteration:</strong> ${data.transliteration}</p>
+                            <p><strong>Rule-Based Translation:</strong> ${data.rule_based}</p>
+                            <p><strong>ML Translation:</strong> ${data.ml_translation}</p>
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('result').innerHTML = `
+                        <div class="result">
+                            <h2>Error:</h2>
+                            <p>${data.error}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('result').innerHTML = `
+                    <div class="result">
+                        <h2>Error:</h2>
+                        <p>Failed to connect to server: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
