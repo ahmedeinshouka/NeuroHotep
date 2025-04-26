@@ -1,0 +1,12 @@
+{
+    "symbol 1": {
+      "english": "eagle",
+      "arabic": "نسر",
+      "phonetic": "A"
+    },
+    "symbol 2": {
+      "english": "foot",
+      "arabic": "قدم",
+      "phonetic": "B"
+    }
+  }
