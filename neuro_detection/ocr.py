@@ -1,3 +1,4 @@
+
 import os
 import cv2
 import numpy as np
@@ -42,41 +43,69 @@ class RoboflowDatasetManager:
     def __init__(self, output_dir="roboflow_hieroglyphs"):
         self.output_dir = output_dir
         self.class_mapping = {}
+        self.dataset_dir = None  # Will store the actual dataset directory
+    
+    def _find_dataset_dir(self):
+        """Find the actual dataset directory containing data.yaml"""
+        # Check the output_dir itself for data.yaml
+        yaml_path = os.path.join(self.output_dir, "data.yaml")
+        if os.path.exists(yaml_path):
+            self.dataset_dir = self.output_dir
+            print(f"Found data.yaml at {self.dataset_dir}")
+            return True
         
+        # Check subdirectories for data.yaml
+        yaml_files = list(Path(self.output_dir).glob("**/data.yaml"))
+        if yaml_files:
+            self.dataset_dir = str(yaml_files[0].parent)
+            print(f"Found data.yaml at {self.dataset_dir}")
+            return True
+        
+        print(f"No data.yaml found in {self.output_dir} or its subdirectories")
+        return False
+    
     def _is_valid_dataset(self):
         """Check if the dataset directory exists and has a valid structure"""
-        if not os.path.exists(self.output_dir):
+        if not self._find_dataset_dir():
             return False
         
-        yaml_path = os.path.join(self.output_dir, "data.yaml")
-        if not os.path.exists(yaml_path):
-            yaml_files = list(Path(self.output_dir).glob("**/data.yaml"))
-            if not yaml_files:
-                return False
-            yaml_path = str(yaml_files[0])
-        
-        train_images_dir = os.path.join(self.output_dir, "train", "images")
+        train_images_dir = os.path.join(self.dataset_dir, "train", "images")
         if not os.path.exists(train_images_dir):
+            print(f"Train images directory not found: {train_images_dir}")
             return False
         
         image_files = list(Path(train_images_dir).glob('*.[jp][pn]g'))
         if not image_files:
+            print(f"No image files found in {train_images_dir}")
             return False
         
-        train_labels_dir = os.path.join(self.output_dir, "train", "labels")
+        train_labels_dir = os.path.join(self.dataset_dir, "train", "labels")
         if not os.path.exists(train_labels_dir):
+            print(f"Train labels directory not found: {train_labels_dir}")
             return False
         
         label_files = list(Path(train_labels_dir).glob('*.txt'))
         if not label_files:
+            print(f"No label files found in {train_labels_dir}")
             return False
         
+        print(f"Valid dataset found at {self.dataset_dir}")
         return True
+    
+    def _log_directory_structure(self):
+        """Log the directory structure for debugging"""
+        print(f"Directory structure of {self.output_dir}:")
+        for root, dirs, files in os.walk(self.output_dir):
+            level = root.replace(self.output_dir, '').count(os.sep)
+            indent = ' ' * 4 * level
+            print(f"{indent}{os.path.basename(root)}/")
+            for f in files:
+                print(f"{indent}    {f}")
     
     def download_and_extract(self):
         """Download dataset from Roboflow only if it doesn't exist or is invalid"""
         if self._is_valid_dataset():
-            print(f"{self.output_dir} contains a valid dataset. Skipping download.")
+            print(f"{self.dataset_dir} contains a valid dataset. Skipping download.")
             return True
         
         print(f"Dataset not found or invalid in {self.output_dir}. Downloading from Roboflow...")
@@ -84,29 +113,37 @@ class RoboflowDatasetManager:
             rf = Roboflow(api_key="sgXEJmk9u471anlPRy71")
             project = rf.workspace("yousef-matar").project("fullhieroglyphsdataset")
             version = project.version(3)
-            dataset = version.download("yolov12", location=self.output_dir)
+            dataset = version.download("yolov5", location=self.output_dir)
             print(f"Dataset downloaded to {self.output_dir}")
+            
+            # Log directory structure after download for debugging
+            self._log_directory_structure()
+            
+            if not self._find_dataset_dir():
+                print("Failed to locate data.yaml in the downloaded dataset.")
+                return False
+                
+            if not self._is_valid_dataset():
+                print("Downloaded dataset is invalid. Check directory structure and contents.")
+                return False
+                
             return True
         except Exception as e:
             print(f"Error downloading dataset: {e}")
-            print("Please ensure the API key is valid and the dataset is accessible.")
+            print("Please ensure the API key is valid, the project/version exists, and the dataset is accessible.")
+            print("You may need to manually download the dataset or verify your Roboflow project settings.")
             return False
     
     def prepare_classification_dataset(self):
         """Convert Roboflow object detection dataset to classification format"""
-        if not os.path.exists(self.output_dir):
-            print(f"Dataset directory {self.output_dir} not found.")
+        if not self._find_dataset_dir():
+            print(f"Dataset directory not found or data.yaml missing in {self.output_dir}.")
             return False
         
-        yaml_path = os.path.join(self.output_dir, "data.yaml")
+        yaml_path = os.path.join(self.dataset_dir, "data.yaml")
         if not os.path.exists(yaml_path):
-            print(f"data.yaml not found in {self.output_dir}. Looking in subdirectories...")
-            yaml_files = list(Path(self.output_dir).glob("**/data.yaml"))
-            if yaml_files:
-                yaml_path = str(yaml_files[0])
-            else:
-                print("Could not find data.yaml.")
-                return False
+            print(f"data.yaml not found at {yaml_path}.")
+            return False
         
         try:
             with open(yaml_path, 'r') as f:
@@ -133,9 +170,13 @@ class RoboflowDatasetManager:
     
     def get_dataset_structure(self):
         """Analyze and return information about dataset structure"""
+        if not self._find_dataset_dir():
+            print("Cannot analyze dataset structure: dataset directory not found.")
+            return {}
+        
         structure = {}
         for split in ['train', 'valid', 'test']:
-            split_dir = os.path.join(self.output_dir, split)
+            split_dir = os.path.join(self.dataset_dir, split)
             if os.path.exists(split_dir):
                 images_dir = os.path.join(split_dir, 'images')
                 labels_dir = os.path.join(split_dir, 'labels')
@@ -173,7 +214,7 @@ class HieroglyphDataset(Dataset):
             return
         
         if not os.path.exists(labels_dir):
-            print(f"Labels directory not found: {labels_dir}")
+            print(f"Labels directory not found: {images_dir}")
             return
         
         image_files = list(Path(images_dir).glob('*.[jp][pn]g'))
@@ -802,7 +843,7 @@ def main():
     structure = dataset_manager.get_dataset_structure()
     print("Dataset structure:", structure)
     
-    classifier = HieroglyphClassifier(data_dir=dataset_manager.output_dir)
+    classifier = HieroglyphClassifier(data_dir=dataset_manager.dataset_dir)
     classifier.setup_from_roboflow(dataset_manager.class_mapping)
     
     try:
@@ -820,7 +861,7 @@ def main():
     classifier.save_model()
     classifier.export_to_onnx()
     
-    test_images_dir = os.path.join(dataset_manager.output_dir, 'test', 'images')
+    test_images_dir = os.path.join(dataset_manager.dataset_dir, 'test', 'images')
     if os.path.exists(test_images_dir):
         test_image_path = next(Path(test_images_dir).glob('*.[jp][pn]g'), None)
         if test_image_path:
